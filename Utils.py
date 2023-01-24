@@ -1,23 +1,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+DIMS = 2
+BOUND = 500
+
 def f(x):
     """Vectorised Schwefel function for one n-dimensional input vector.
     :param x: input vector
     """
     return -np.dot(np.sin(np.sqrt(np.abs(x))), x)
 
-def penalty_f(x, bound, temp):
+def penalty_f(x):
     """Vectorised Schwefel function with linear penalty.
     :param x: input vector for function to be evaluated on
     :param iter: iteration function is evaluated
     :param bound: -bound <= x_i <= bound
     """
-    w = 100*np.ones(x.shape)
-    # pick out elements of vector x that are less than 500
-    w[x<500] = 0
-    c_v = x-bound
-    return f(x) + w.T@c_v/temp
+    w = 50*np.ones(DIMS)
+    # Pick out elements of array x > 500 in absolute value
+    idx = np.argwhere(np.abs(x)<500)
+    w[idx] = 0
+    c_v = np.abs(np.array(x))-BOUND
+    return f(x) + w.T@c_v
 
 def penalty_f_evolving(x, iter, mu, bound):
     """Vectorised Schwefel function with linear penalty.
@@ -34,10 +38,10 @@ def penalty_f_evolving(x, iter, mu, bound):
 
 def plot_2D(title):
     """Plot 2D function."""
-    x = np.linspace(-500, 500, 1000)
-    y = np.linspace(-500, 500, 1000)
+    x = np.linspace(-600, 600, 1000)
+    y = np.linspace(-600, 600, 1000)
     X, Y = np.meshgrid(x, y)
-    Z = list(map(lambda x: f(x), zip(X.flatten(), Y.flatten())))
+    Z = list(map(lambda x: penalty_f(x), zip(X.flatten(), Y.flatten())))
     Z = np.array(Z).reshape((1000, 1000))
     plt.contour(X, Y, Z, 15, cmap='viridis')
     plt.colorbar()
@@ -45,4 +49,4 @@ def plot_2D(title):
     plt.show()
 
 if __name__ == "__main__":
-    plot_2D("Schwefel_2D.png")
+    plot_2D("Schwefel_penalty_2D.png")
