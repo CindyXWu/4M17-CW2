@@ -179,16 +179,19 @@ class Simulated_Annealing():
         if len(self.best_archive) == self.ALIM and not dissimilar:
 
             # Archive if best solution found so far and replace worst archived within dmin
-            if self.f_val < min(self.best_archive,key=itemgetter(0))[0]:
-                self.best_archive.append([self.f_val, self.x])
-                self.best_archive.remove(max(self.within_dmin, key=itemgetter(0)))
-                return
+            try:
+                if self.f_val < min(self.best_archive,key=itemgetter(0))[0]:
+                    self.best_archive.append([self.f_val, self.x])
+                    self.best_archive.remove(max(self.within_dmin, key=itemgetter(0)))
+                    return
 
-            # If not best solution found so far, but within dsim of some solution(s)
-            if self.within_dsim:
-                self.best_archive.append([self.f_val, self.x])
-                self.best_archive.remove(max(self.within_dsim, key=itemgetter(0)))
-                return
+                # If not best solution found so far, but within dsim of some solution(s)
+                if self.within_dsim:
+                    self.best_archive.append([self.f_val, self.x])
+                    self.best_archive.remove(max(self.within_dsim, key=itemgetter(0)))
+                    return
+            except IndexError or ValueError:
+                print('IndexError or ValueError in archive method.')
 
     def __dissimilar(self):
         """Check if new solution is dissimilar to previously found solutions.
@@ -220,7 +223,7 @@ class Simulated_Annealing():
         Z = np.array(Z).reshape((1000, 1000))
         plt.contour(X, Y, Z, 15, cmap='viridis')
         t = np.arange(len(points))
-        plt.scatter([x[0] for x in points], [x[1] for x in points], c=t, s=10)
+        plt.scatter([x[0] for x in points], [x[1] for x in points], c=t, s=25)
         plt.colorbar()
         plt.savefig(output_dir+title, dpi=300)
 
@@ -269,11 +272,13 @@ class Simulated_Annealing():
             xs = [data[1] for data in self.best_archive]
             self.plot_2D(xs, "2D_VL_update_adaptcool_Huang_archive.png")
 
-# bound = np.array([500, 500])
+# bound = np.array([500, 500, 500, 500, 500, 500])
 # cl = 100
 # step_size = 1000
 # final_temp = 1
 # algo1 = Simulated_Annealing(init_prob=0.8, bound=bound, chain_length=cl, step_size=step_size, eta=0.6*cl, cool_rate=0.95, max_iter=15000, final_temp=final_temp, min_acceptance_prob=0.001, dmin=50, dsim=5, a_lim=10)
+# algo1.main_search(algo1.update_x_VL)
+# plot_results(np.arange(0, len(algo1.historic_archive_f)), algo1.historic_archive_f, "Accepted move number", "Function Value", "Base test 2D evol"+str(cl)+".png", output_dir)
 
 if __name__ == "__main__":
 
@@ -291,7 +296,7 @@ if __name__ == "__main__":
     high_cl_evol = []
     
     # Edit chain lengths to test
-    chain_lengths = np.logspace(1, 3, 10, dtype=int)
+    chain_lengths = np.logspace(1, 3, 5, dtype=int)
     cl_dir = "SA_CL/"
     if not os.path.exists(cl_dir):
         os.makedirs(cl_dir)
@@ -309,8 +314,9 @@ if __name__ == "__main__":
         f_vals = []
         dim_vars = []
         f_eval_nums = []
-        for i in tqdm(range(30)):
-            algo1 = Simulated_Annealing(init_prob=0.8, bound=bound, chain_length=cl, step_size=step_size, eta=0.6*cl, cool_rate=0.95, max_iter=15000, final_temp=final_temp, min_acceptance_prob=0.001, dmin=50, dsim=5, a_lim=10)
+        print("Chain length:", cl)
+        for i in tqdm(range(10)):
+            algo1 = Simulated_Annealing(init_prob=0.8, bound=bound, chain_length=cl, step_size=step_size, eta=0.6*cl, cool_rate=0.95, max_iter=15000, final_temp=final_temp, min_acceptance_prob=0.001, dmin=70, dsim=5, a_lim=10)
             start_time = timeit.default_timer()
             algo1.main_search(algo1.update_x_VL)
             runtimes.append(timeit.default_timer() - start_time)
@@ -321,21 +327,12 @@ if __name__ == "__main__":
         all_runtimes.append(np.mean(np.array(runtimes)))
         all_best_solutions.append(np.mean(np.array(solutions)))
         # Mean variance of all dimensions in solution found
-        all_sol_variances.append(np.mean(np.array(solutions)))
+        all_sol_variances.append(np.var(np.array(solutions)))
         all_f_vals_variances.append(np.var(np.array(f_vals)))
         all_f_vals.append(np.mean(np.array(f_vals)))
         all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
-        if cl == 10:
-            low_cl_archive = [data[0] for data in algo1.best_archive]
-            low_cl_evol = algo1.historic_archive_f
-        elif cl == 1000:
-            high_cl_archive = [data[0] for data in algo1.best_archive]
-            high_cl_evol = algo1.historic_archive_f
+        plot_results(np.arange(0, len(algo1.historic_archive_f)), algo1.historic_archive_f, "Accepted move number", "Function Value", "function_evolution_chain_length_"+str(cl)+".png", cl_dir)
 
-    np.savetxt(cl_dir+"function_evolution_cl10.csv", np.array(low_cl_evol), delimiter=",")
-    np.savetxt(cl_dir+"function_evolution_cl100.csv", np.array(high_cl_evol), delimiter=",")
-    np.savetxt(cl_dir+"best_archive_cl10.csv", np.array(low_cl_archive), delimiter=",")
-    np.savetxt(cl_dir+"best_archive_cl100.csv", np.array(high_cl_archive), delimiter=",")
     np.savetxt(cl_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
     np.savetxt(cl_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
     np.savetxt(cl_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
@@ -352,79 +349,71 @@ if __name__ == "__main__":
     plot_results(chain_lengths, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", cl_dir)
 
 
-    #========================= step size ==========================
-    all_runtimes = []
-    all_f_vals = []
-    all_sol_variances = []
-    all_best_solutions = []
-    all_f_vals_variances = []
-    all_f_eval_nums = []
+#     #========================= step size ==========================
+#     all_runtimes = []
+#     all_f_vals = []
+#     all_sol_variances = []
+#     all_best_solutions = []
+#     all_f_vals_variances = []
+#     all_f_eval_nums = []
 
-    low_ss_archive = []
-    low_ss_evol = []
-    high_ss_archive = []
-    high_ss_evol = []
+#     low_ss_archive = []
+#     low_ss_evol = []
+#     high_ss_archive = []
+#     high_ss_evol = []
     
-    step_sizes = np.logspace(1, 3, 10)
-    step_size_dir = "SA_SS/"
-    if not os.path.exists(step_size_dir):
-        os.makedirs(step_size_dir)
+#     step_sizes = np.logspace(1, 3, 10)
+#     step_size_dir = "SA_SS/"
+#     if not os.path.exists(step_size_dir):
+#         os.makedirs(step_size_dir)
 
-    # Bound dimensions defines dimensionality of problem (no separate specification to avoid ssashes)
-    bound = np.array([500, 500, 500])
-    dims = len(bound)
-    chain_length = 100
-    final_temp = 1
+#     # Bound dimensions defines dimensionality of problem (no separate specification to avoid ssashes)
+#     bound = np.array([500, 500, 500, 500, 500, 500])
+#     dims = len(bound)
+#     chain_length = 100
+#     final_temp = 1
 
-    # Run 50 times for each chain length
-    for ss in step_sizes:
-        runtimes = []
-        solutions = []
-        f_vals = []
-        dim_vars = []
-        f_eval_nums = []
-        for i in tqdm(range(30)):
-            algo1 = Simulated_Annealing(init_prob=0.8, bound=bound, chain_length=chain_length, step_size=ss, eta=0.6*ss, cool_rate=0.95, max_iter=15000, final_temp=final_temp, min_acceptance_prob=0.001, dmin=50, dsim=5, a_lim=10)
-            start_time = timeit.default_timer()
-            algo1.main_search(algo1.update_x_VL)
-            runtimes.append(timeit.default_timer() - start_time)
-            # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
-            solutions.append(np.mean(algo1.best[1]))
-            f_vals.append(algo1.best[0])
-            f_eval_nums.append(algo1.f_evals)
-        all_runtimes.append(np.mean(np.array(runtimes)))
-        all_best_solutions.append(np.mean(np.array(solutions)))
-        # Mean variance of all dimensions in solution found
-        all_sol_variances.append(np.mean(np.array(solutions)))
-        all_f_vals_variances.append(np.var(np.array(f_vals)))
-        all_f_vals.append(np.mean(np.array(f_vals)))
-        all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
-        if ss == 10:
-            low_ss_archive = [data[0] for data in algo1.best_archive]
-            low_ss_evol = algo1.historic_archive_f
-        elif ss == 100:
-            high_ss_archive = [data[0] for data in algo1.best_archive]
-            high_ss_evol = algo1.historic_archive_f
+#     # Run 50 times for each chain length
+#     for ss in step_sizes:
+#         runtimes = []
+#         solutions = []
+#         f_vals = []
+#         dim_vars = []
+#         f_eval_nums = []
+#         for i in tqdm(range(25)):
+#             algo1 = Simulated_Annealing(init_prob=0.8, bound=bound, chain_length=chain_length, step_size=ss, eta=0.6*ss, cool_rate=0.95, max_iter=15000, final_temp=final_temp, min_acceptance_prob=0.001, dmin=50, dsim=5, a_lim=10)
+#             start_time = timeit.default_timer()
+#             algo1.main_search(algo1.update_x_VL)
+#             runtimes.append(timeit.default_timer() - start_time)
+#             # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
+#             solutions.append(np.mean(algo1.best[1]))
+#             f_vals.append(algo1.best[0])
+#             f_eval_nums.append(algo1.f_evals)
+#         all_runtimes.append(np.mean(np.array(runtimes)))
+#         all_best_solutions.append(np.mean(np.array(solutions)))
+#         # Mean variance of all dimensions in solution found
+#         all_sol_variances.append(np.var(np.array(solutions)))
+#         all_f_vals_variances.append(np.var(np.array(f_vals)))
+#         all_f_vals.append(np.mean(np.array(f_vals)))
+#         all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
+#         plot_results(np.arange(0, len(algo1.historic_archive_f)), algo1.historic_archive_f, "Accepted move number", "Function Value", "function_evolution_step_size_"+str(ss)+".png", step_size_dir)
 
-    np.savetxt(step_size_dir+"function_evolution_ss10.csv", np.array(low_ss_evol), delimiter=",")
-    np.savetxt(step_size_dir+"function_evolution_ss100.csv", np.array(high_ss_evol), delimiter=",")
-    np.savetxt(step_size_dir+"best_archive_ss10.csv", np.array(low_ss_archive), delimiter=",")
-    np.savetxt(step_size_dir+"best_archive_ss100.csv", np.array(high_ss_archive), delimiter=",")
-    np.savetxt(step_size_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
-    np.savetxt(step_size_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
-    np.savetxt(step_size_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
-    np.savetxt(step_size_dir+"step_sizes.csv", np.array(step_sizes), delimiter=",")
-    np.savetxt(step_size_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
-    np.savetxt(step_size_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
-    np.savetxt(step_size_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
-    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_ss10", step_size_dir)
-    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_ss100", step_size_dir)
-    plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime",  step_size_dir)
-    plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", step_size_dir)
-    plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", step_size_dir)
-    plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", step_size_dir)
-    plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", step_size_dir)
 
-# ===================================== Cooling rate against final temperature =====================================
+#     np.savetxt(step_size_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
+#     np.savetxt(step_size_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
+#     np.savetxt(step_size_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
+#     np.savetxt(step_size_dir+"step_sizes.csv", np.array(step_sizes), delimiter=",")
+#     np.savetxt(step_size_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
+#     np.savetxt(step_size_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
+#     np.savetxt(step_size_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
+#     plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_ss10", step_size_dir)
+#     plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_ss100", step_size_dir)
+#     plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime",  step_size_dir)
+#     plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", step_size_dir)
+#     plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", step_size_dir)
+#     plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", step_size_dir)
+#     plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", step_size_dir)
+
+# # ===================================== Cooling rate against final temperature =====================================
 
 

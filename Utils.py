@@ -48,14 +48,29 @@ def plot_2D(title):
     plt.savefig(title, dpi=300)
     plt.show()
 
+def plot_fn_results(x, y, fevals, xlabel, ylabel, title, output_dir):
+    """Plot function value varying over 2 parameters."""
+    X, Y = np.meshgrid(x, y)
+    #Z = list(map(lambda x: penalty_f(x), zip(X.flatten(), Y.flatten())))
+    #Z = np.array(Z).reshape((1000, 1000))
+    plt.contourf(X, Y, fevals, 20, cmap='viridis')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.colorbar()
+    plt.savefig(output_dir+title, dpi=300)
+    plt.show()
+
 def plot_results(x, y, xlabel, ylabel, title, output_dir):
     """Plot average function value or variance as a function of some parameter"""
-    fig = plt.figure(figsize=(10,6))
+    fig = plt.figure(figsize=(8,5))
     ax  = fig.add_subplot(111)
     ax.plot(x, y)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     plt.savefig(output_dir+title)
 
-if __name__ == "__main__":
-    plot_2D("Schwefel_penalty_2D.png")
+# if __name__ == "__main__":
+#     x = [1, 2, 3]
+#     y = [4, 5, 6]
+#     fevals = np.random.uniform(0, 10, 9).reshape(3, 3)
+#     plot_fn_results(x, y, fevals, "test.png")
