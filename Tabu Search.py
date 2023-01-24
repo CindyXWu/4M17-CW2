@@ -89,9 +89,7 @@ class Tabu_Search():
         """Search intensification: move to average of MTM solutions"""
         print("Intensification")
         MTM = np.array(self.MTM)
-        print("MTM: ", MTM)
         self.x = np.mean(MTM[:,1], axis=0)
-        print("x after intensification: ", self.x)
 
     def diversification(self):
         """Search diversification: move to randomly selected part of search space. Involves discretising search space into grid."""
@@ -111,13 +109,13 @@ class Tabu_Search():
         # Reset counter
         self.counter = 0
 
-    def update_memories(self, x, f_val):
+    def update_memories(self):
         """Update STM, MTM."""
         if len(self.STM) <= self.STM_LEN:
-            self.STM.append(x.tolist())
+            self.STM.append(self.x.tolist())
         else:
             self.STM.pop(0)
-            self.STM.append(x.tolist())
+            self.STM.append(self.x.tolist())
         # Update MTM (list of tuples [f_val, x])
         if len(self.MTM) < self.MTM_LEN:
             self.MTM.append([self.f_val, self.x])
@@ -185,60 +183,66 @@ class Tabu_Search():
         plt.colorbar()
         plt.savefig(output_dir+title, dpi=300)
         plt.show()
+    
+    def local_search(self):
+        """Local search loop, including pattern move."""
+        self.delta_fs = np.empty(2*self.DIMS)
+
+        for i in range(self.DIMS):
+            new_x = self.x
+            new_x[i] += self.STEP_SIZE
+            # If new solution in STM or out of bounds, set delta f as infinity
+            # if any(np.array_equal(new_x, data) for data in self.STM) or any(np.abs(x_i) > self.BOUND for x_i in new_x):
+            if new_x.tolist() in self.STM or any(np.abs(x_i) > self.BOUND for x_i in new_x):
+                self.delta_fs[i] = np.inf
+            else:
+                self.delta_fs[i] = self.penalty_f(new_x) - self.f_val
+            
+            # Now for decrement
+            new_x = self.x
+            new_x[i] -= self.STEP_SIZE
+            if  new_x.tolist() in self.STM or any(np.abs(x_i) > self.BOUND for x_i in new_x):
+                self.delta_fs[i+self.DIMS] = np.inf
+            else:
+                self.delta_fs[i+self.DIMS] = self.penalty_f(new_x) - self.f_val
+
+        if not all(np.isinf(self.delta_fs)):
+            # Otherwise make move that reduces function most
+            best_idx = np.argmin(self.delta_fs)
+            move = np.zeros(self.DIMS)
+            if best_idx < self.DIMS:
+                idx = best_idx
+                move[idx] += self.STEP_SIZE
+            else:
+                idx = best_idx - self.DIMS
+                move[idx] -= self.STEP_SIZE
+
+            # Pattern moves
+            x_new = self.x + move
+            x1 = x_new
+            x2 = x1 + move
+            f1 = self.penalty_f(x1)
+            f2 = self.penalty_f(x2)
+            while f2 < f1:
+                x1 = x2
+                f1 = f2
+                x2 = x1 + move
+                f2 = self.penalty_f(x2)
+            self.x = x1
+            self.f_val = f1
+            return True
+        else:
+            return False
 
     def main_search(self):
         """Main search loop"""
         while self.STEP_SIZE > self.CONV_SS and self.f_evals < 15000:
 
-            self.delta_fs = np.empty(2*self.DIMS)
-            new_sol = False
-            for i in range(self.DIMS):
-                new_x = self.x
-                new_x[i] += self.STEP_SIZE
-                # If new solution in STM or out of bounds, set delta f as infinity
-                # if any(np.array_equal(new_x, data) for data in self.STM) or any(np.abs(x_i) > self.BOUND for x_i in new_x):
-                if new_x.tolist() in self.STM or any(np.abs(x_i) > self.BOUND for x_i in new_x):
-                    self.delta_fs[i] = np.inf
-                else:
-                    self.delta_fs[i] = self.penalty_f(new_x) - self.f_val
-                
-                # Now for decrement
-                new_x = self.x
-                new_x[i] -= self.STEP_SIZE
-                if  new_x.tolist() in self.STM or any(np.abs(x_i) > self.BOUND for x_i in new_x):
-                    self.delta_fs[i+self.DIMS] = np.inf
-                else:
-                    self.delta_fs[i+self.DIMS] = self.penalty_f(new_x) - self.f_val
-
-            if not all(np.isinf(self.delta_fs)):
-                # Otherwise make move that reduces function most
-                best_idx = np.argmin(self.delta_fs)
-                move = np.zeros(self.DIMS)
-                if best_idx < self.DIMS:
-                    idx = best_idx
-                    move[idx] += self.STEP_SIZE
-                else:
-                    idx = best_idx - self.DIMS
-                    move[idx] -= self.STEP_SIZE
-
-                # Pattern moves
-                x_new = self.x + move
-                x1 = x_new
-                x2 = x1 + move
-                f1 = self.penalty_f(x1)
-                f2 = self.penalty_f(x2)
-                while f2 < f1:
-                    x1 = x2
-                    f1 = f2
-                    x2 = x1 + move
-                    f2 = self.penalty_f(x2)
-                self.x = x1
-                self.f_val = f1
-                new_sol = True
+            new_sol = self.local_search()
 
             if new_sol:
                 self.update_grid()
-                self.update_memories(self.x, self.f_val)
+                self.update_memories()
                 self.archive()
                 self.historic_archive.append(self.x)
                 self.historic_archive_f.append(self.f_val)
