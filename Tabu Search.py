@@ -36,24 +36,24 @@ class Tabu_Search():
         self.counter = 0    # Counter for number of iterations of unsuccessful evaluation
         self.x = np.random.uniform(-bound, bound, self.DIMS)   # Initial x random in permissible space
         self.f_val = self.penalty_f(self.x)
-        self.f_new = np.inf
         self.best_f_eval = np.inf # Best function value so far, used for triggering SSD
         self.best_x = np.inf   # Best solution so far
+        self.to_change = [] # Index of element of x to change in local search. Used for prioritisation of control variables.
 
         # Solution saving
-        self.STM = []
-        self.MTM = []  # List of tuples (f(x), x)
+        self.STM = [self.x.tolist()]
+        self.MTM = [[self.f_val, self.x]]  # List of tuples (f(x), x)
         self.DMIN = dmin
         self.DSIM = dsim
         self.ALIM = a_lim    # Archive size
         # Archive also acts as MTM
-        self.best_archive = []   # Archive for best solutions; list of tuples: (f(x), x)
+        self.best_archive = [[self.f_val, self.x]]   # Archive for best solutions; list of tuples: (f(x), x)
         self.within_dmin = []   # Values in archive within dmin of current solution (dynamically updated)
         self.within_dsim = []   # Values in archive within dsim of current solution (dynamically updated)
-        self.historic_archive = [] # Archive of all accepted solutions in history of algo (used only for 2D plots)
-        self.historic_archive_f = [] # Archive of all accepted f(x) values in history of algo (used only for 2D plots)
+        self.historic_archive = [self.x] # Archive of all accepted solutions in history of algo (used only for 2D plots)
+        self.historic_archive_f = [self.f_val] # Archive of all accepted f(x) values in history of algo (used only for 2D plots)
         d_grid = np.array([grid_num]*self.DIMS)
-        self.grid_sols = np.empty(d_grid)   # Save number of solutions in each grid square. Initialise as empty array with dimensions grid_num^dims
+        self.grid_sols = np.zeros(d_grid)   # Save number of solutions in each grid square. Initialise as empty array with dimensions grid_num^dims
     
     def f(self, x):
         """Schwefel function for one n-dimensional input vector."""
@@ -87,17 +87,21 @@ class Tabu_Search():
         
     def intensification(self):
         """Search intensification: move to average of MTM solutions"""
-        print("Intensification")
+        print("Intensification - MTM", self.MTM)
         MTM = np.array(self.MTM)
         self.x = np.mean(MTM[:,1], axis=0)
 
     def diversification(self):
         """Search diversification: move to randomly selected part of search space. Involves discretising search space into grid."""
         print("Diversification")
+        if not np.any(self.grid_sols):
+            # If no solutions found yet, pick random point
+            self.x = np.random.uniform(-self.BOUND, self.BOUND, self.DIMS)
+            return
         # Pick out first grid square with least number of solutions
         idxs = np.argwhere(self.grid_sols == np.min(self.grid_sols))
         # Randomly pick one of these grid cubes
-        idx = idxs[np.random.randint(len(idxs))]
+        idx = idxs[np.random.randint(0, len(idxs))]
         # Randomly pick point in that grid cube
         for i in range(self.DIMS):
             self.x[i] = np.random.uniform(self.GRID_CENTRES[idx[i]]-self.HALF_GRID, self.GRID_CENTRES[idx[i]]+self.HALF_GRID)
@@ -186,13 +190,18 @@ class Tabu_Search():
     
     def local_search(self):
         """Local search loop, including pattern move."""
+        # Holds delta f values for each dimension's proposed move (increment and decrement)
         self.delta_fs = np.empty(2*self.DIMS)
+        # Selection of which dimensions to change
+        if len(self.to_change) == 0:
+            dims_to_search = range(self.DIMS)
+        else:
+            dims_to_search = self.to_change
 
-        for i in range(self.DIMS):
+        for i in dims_to_search:
             new_x = self.x
             new_x[i] += self.STEP_SIZE
             # If new solution in STM or out of bounds, set delta f as infinity
-            # if any(np.array_equal(new_x, data) for data in self.STM) or any(np.abs(x_i) > self.BOUND for x_i in new_x):
             if new_x.tolist() in self.STM or any(np.abs(x_i) > self.BOUND for x_i in new_x):
                 self.delta_fs[i] = np.inf
             else:
@@ -233,6 +242,29 @@ class Tabu_Search():
             return True
         else:
             return False
+    
+    def var_prioritise_local_search(self):
+        """For larger dimensions, searching all control variables gets messy.
+        Prioritise searching control variables with greatest influence on objective function. 
+        """
+        sensitivity = np.empty(self.DIMS)
+        self.to_change = None
+        f = self.f(self.x)
+        for i in range(self.DIMS):
+            new_x = self.x
+            new_x[i] += self.STEP_SIZE
+            plusf = self.f(new_x) - f
+            # Now for decrement
+            new_x = self.x
+            new_x[i] -= self.STEP_SIZE
+            minusf = self.f(new_x) - f
+            sensitivity[i] = np.abs((plusf - minusf)/(2*self.STEP_SIZE))
+        # Return indices that would sort the sensitivity array ascending
+        idxs = np.argsort(sensitivity)
+        # Pick highest sensitivity variables to search
+        self.to_change = idxs[:int(self.DIMS/1.5)]
+        print(self.to_change)
+        self.local_search()
 
     def main_search(self):
         """Main search loop"""
@@ -266,12 +298,11 @@ class Tabu_Search():
                 continue
         # Plotting for 2D
         if self.DIMS == 2:
-            self.plot_2D(self.historic_archive, "2D_TS_initial.png")
+            self.plot_2D(self.historic_archive, "2D_TS_prioritisation.png")
 
 if __name__ == "__main__":
     runtimes = []         
-    algo1 = Tabu_Search(max_iter=15000, step_size=100, bound=500, dims=2, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
-    print(algo1.x)
+    algo1 = Tabu_Search(max_iter=15000, step_size=100, bound=500, dims=10, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
     algo1.main_search()
     print(algo1.historic_archive)
     print(algo1.MTM)
