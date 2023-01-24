@@ -153,7 +153,7 @@ class Tabu_Search():
             # If not best solution found so far, but within dsim of some solution(s)
             if self.within_dsim:
                 self.best_archive.append([self.f_val, self.x])
-                self.best_archive.remove(max(self.within_dsim, key=itemgetter(0)))
+                self.best_archive.remove(max(self.within_dsim, key=lambda x: x[0]))
                 return
     
     def __dissimilar(self):
@@ -326,8 +326,8 @@ if __name__ == "__main__":
 
     # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
     bound = 500
-    dims = 2
-    step_sizes = np.logspace(10, 50, 100)
+    dims = 6
+    step_sizes = np.logspace(1, 2.7, 10)
     step_size_dir = "TS_SS/"
     if not os.path.exists(step_size_dir):
         os.makedirs(step_size_dir)
@@ -338,8 +338,8 @@ if __name__ == "__main__":
         f_vals = []
         dim_vars = []
         f_eval_nums = []
-        for i in tqdm(range(2)):
-            algo1 = Tabu_Search(max_iter=15000, step_size=ss, bound=bound, dims=dims, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
+        for i in tqdm(range(5)):
+            algo1 = Tabu_Search(max_iter=15000, step_size=ss, bound=bound, dims=dims, ssr_tr=100, intensify_tr=30, diversify_tr=50, ssr_redu_factor=0.95, len_stm=20, len_mtm=30, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
             start_time = timeit.default_timer()
             algo1.main_search()
             runtimes.append(timeit.default_timer() - start_time)
@@ -354,17 +354,8 @@ if __name__ == "__main__":
         all_f_vals_variances.append(np.var(np.array(f_vals)))
         all_f_vals.append(np.mean(np.array(f_vals)))
         all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
-        if ss == 10:
-            low_ss_archive = [data[0] for data in algo1.best_archive]
-            low_ss_evol = algo1.historic_archive_f
-        elif ss == 500:
-            high_ss_archive = [data[0] for data in algo1.best_archive]
-            high_ss_evol = algo1.historic_archive_f
+        plot_results(np.arange(0, len(algo1.historic_archive_f)), algo1.historic_archive_f, "Accepted move number", "Function Value", "function_evolution_step_size_", step_size_dir)
     
-    np.savetxt(step_size_dir+"function_evolution_cl10.csv", np.array(low_ss_evol), delimiter=",")
-    np.savetxt(step_size_dir+"function_evolution_cl100.csv", np.array(high_ss_evol), delimiter=",")
-    np.savetxt(step_size_dir+"best_archive_cl10.csv", np.array(low_ss_archive), delimiter=",")
-    np.savetxt(step_size_dir+"best_archive_cl100.csv", np.array(high_ss_archive), delimiter=",")
     np.savetxt(step_size_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
     np.savetxt(step_size_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
     np.savetxt(step_size_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
@@ -372,81 +363,67 @@ if __name__ == "__main__":
     np.savetxt(step_size_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
     np.savetxt(step_size_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
     np.savetxt(step_size_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
-    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10", step_size_dir)
-    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100", step_size_dir)
-    plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime", step_size_dir)
-    plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", step_size_dir)
-    plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", step_size_dir)
-    plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", step_size_dir)
-    plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", step_size_dir)
+    plot_results(step_sizes, all_runtimes, "Step Size", "Runtime (s)", "Runtime", step_size_dir)
+    plot_results(step_sizes, all_best_solutions, "Step Size", "Average Solution Control Variable Value", "Average Solution Control Variable Value", step_size_dir)
+    plot_results(step_sizes, all_sol_variances, "Step Size", "Average Control Variable Variance", "Average Control Variable Variance", step_size_dir)
+    plot_results(step_sizes, all_f_vals, "Step Size", "Average Function Value", "Average Function Value", step_size_dir)
+    plot_results(step_sizes, all_f_vals_variances, "Step Size", "Variance in Function Value", "Variance in Function Value", step_size_dir)
 
-    #========================================== step size reduction factor ==========================================
-    all_runtimes = []
-    all_f_vals = []
-    all_sol_variances = []
-    all_best_solutions = []
-    all_f_vals_variances = []
-    all_f_eval_nums = []
+    # #========================================== step size reduction factor ==========================================
+    # all_runtimes = []
+    # all_f_vals = []
+    # all_sol_variances = []
+    # all_best_solutions = []
+    # all_f_vals_variances = []
+    # all_f_eval_nums = []
 
-    low_ss_archive = []
-    low_ss_evol = []
-    high_ss_archive = []
-    high_ss_evol = []
+    # low_ss_archive = []
+    # low_ss_evol = []
+    # high_ss_archive = []
+    # high_ss_evol = []
 
-    # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
-    bound = 500
-    dims = 6
-    step_size = 100
-    # ssrs = [0.5, 0.75, 0.85, 0.9, 0.95, 0.99]
-    ssrs = [0.5, 0.9]
-    ssr_dir = "TS_SSRED/"
-    if not os.path.exists(ssr_dir):
-        os.makedirs(ssr_dir)
+    # # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
+    # bound = 500
+    # dims = 6
+    # step_size = 100
+    # ssrs = np.linspace(0.5, 0.99, 10)
+    # ssr_dir = "TS_SSRED/"
+    # if not os.path.exists(ssr_dir):
+    #     os.makedirs(ssr_dir)
 
-    for ssr in ssrs:
-        runtimes = []
-        solutions = []
-        f_vals = []
-        dim_vars = []
-        f_eval_nums = []
-        for i in tqdm(range(2)):
-            algo1 = Tabu_Search(max_iter=15000, step_size=step_size, bound=bound, dims=dims, ssr_tr=ssr, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
-            start_time = timeit.default_timer()
-            algo1.main_search()
-            runtimes.append(timeit.default_timer() - start_time)
-            # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
-            solutions.append(np.mean(algo1.best[1]))
-            f_vals.append(algo1.best[0])
-            f_eval_nums.append(algo1.f_evals)
-        all_runtimes.append(np.mean(np.array(runtimes)))
-        all_best_solutions.append(np.mean(np.array(solutions)))
-        # Mean variance of all dimensions in solution found
-        all_sol_variances.append(np.mean(np.array(solutions)))
-        all_f_vals_variances.append(np.var(np.array(f_vals)))
-        all_f_vals.append(np.mean(np.array(f_vals)))
-        all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
-        if ss == 10:
-            low_ss_archive = [data[0] for data in algo1.best_archive]
-            low_ss_evol = algo1.historic_archive_f
-        elif ss == 500:
-            high_ss_archive = [data[0] for data in algo1.best_archive]
-            high_ss_evol = algo1.historic_archive_f
+    # for ssr in ssrs:
+    #     runtimes = []
+    #     solutions = []
+    #     f_vals = []
+    #     dim_vars = []
+    #     f_eval_nums = []
+    #     for i in tqdm(range(50)):
+    #         algo1 = Tabu_Search(max_iter=15000, step_size=step_size, bound=bound, dims=dims, ssr_tr=100, intensify_tr=30, diversify_tr=50, ssr_redu_factor=ssr, len_stm=20, len_mtm=30, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
+    #         start_time = timeit.default_timer()
+    #         algo1.main_search()
+    #         runtimes.append(timeit.default_timer() - start_time)
+    #         # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
+    #         solutions.append(np.mean(algo1.best[1]))
+    #         f_vals.append(algo1.best[0])
+    #         f_eval_nums.append(algo1.f_evals)
+    #     all_runtimes.append(np.mean(np.array(runtimes)))
+    #     all_best_solutions.append(np.mean(np.array(solutions)))
+    #     # Mean variance of all dimensions in solution found
+    #     all_sol_variances.append(np.mean(np.array(solutions)))
+    #     all_f_vals_variances.append(np.var(np.array(f_vals)))
+    #     all_f_vals.append(np.mean(np.array(f_vals)))
+    #     all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
+    #     plot_results(np.arange(0, len(algo1.historic_archive_f)), algo1.historic_archive_f, "Accepted move number", "Function Value", "function_evolution_step_size_"+str(ssr), ssr_dir)
 
-    np.savetxt(ssr_dir+"function_evolution_cl10.csv", np.array(low_ss_evol), delimiter=",")
-    np.savetxt(ssr_dir+"function_evolution_cl100.csv", np.array(high_ss_evol), delimiter=",")
-    np.savetxt(ssr_dir+"best_archive_cl10.csv", np.array(low_ss_archive), delimiter=",")
-    np.savetxt(ssr_dir+"best_archive_cl100.csv", np.array(high_ss_archive), delimiter=",")
-    np.savetxt(ssr_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
-    np.savetxt(ssr_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
-    np.savetxt(ssr_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
-    np.savetxt(ssr_dir+"ssrs.csv", np.array(ssrs), delimiter=",")
-    np.savetxt(ssr_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
-    np.savetxt(ssr_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
-    np.savetxt(ssr_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
-    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10", ssr_dir)
-    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100", ssr_dir)
-    plot_results(ssrs, all_runtimes, "Chain Length", "Runtime (s)", "Runtime", ssr_dir)
-    plot_results(ssrs, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", ssr_dir)
-    plot_results(ssrs, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", ssr_dir)
-    plot_results(ssrs, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", ssr_dir)
-    plot_results(ssrs, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", ssr_dir)
+    # np.savetxt(ssr_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
+    # np.savetxt(ssr_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
+    # np.savetxt(ssr_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
+    # np.savetxt(ssr_dir+"ssrs.csv", np.array(ssrs), delimiter=",")
+    # np.savetxt(ssr_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
+    # np.savetxt(ssr_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
+    # np.savetxt(ssr_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
+    # plot_results(ssrs, all_runtimes, "Step Size Reduction Factor", "Runtime (s)", "Runtime", ssr_dir)
+    # plot_results(ssrs, all_best_solutions, "Step Size Reduction Factor", "Average Solution Control Variable Value", "Average Solution Control Variable Value", ssr_dir)
+    # plot_results(ssrs, all_sol_variances, "Step Size Reduction Factor", "Average Control Variable Variance", "Average Control Variable Variance", ssr_dir)
+    # plot_results(ssrs, all_f_vals, "Step Size Reduction Factor", "Average Function Value", "Average Function Value", ssr_dir)
+    # plot_results(ssrs, all_f_vals_variances, "Step Size Reduction Factor", "Variance in Function Value", "Variance in Function Value", ssr_dir)
