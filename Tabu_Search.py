@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import timeit
-import heapq
 from operator import itemgetter
 import os
+from tqdm import tqdm
 from Utils import *
 
 output_dir = "TS/"
@@ -88,13 +88,11 @@ class Tabu_Search():
         
     def intensification(self):
         """Search intensification: move to average of MTM solutions"""
-        print("Intensification - MTM", self.MTM)
         MTM = np.array(self.MTM)
         self.x = np.mean(MTM[:,1], axis=0)
 
     def diversification(self):
         """Search diversification: move to randomly selected part of search space. Involves discretising search space into grid."""
-        print("Diversification")
         if not np.any(self.grid_sols):
             # If no solutions found yet, pick random point
             self.x = np.random.uniform(-self.BOUND, self.BOUND, self.DIMS)
@@ -109,7 +107,6 @@ class Tabu_Search():
     
     def step_size_reduction(self):
         """If no best solution found for ssr_tr number of steps, reduce step size"""
-        print("Step size reduction")
         self.STEP_SIZE *= self.ssr_factor
         # Reset counter
         self.counter = 0
@@ -140,7 +137,8 @@ class Tabu_Search():
 
         # Archive full + solution dissimilar to all present + better than largest f valued solution in archive, replace worst with current solution
         if len(self.best_archive) == self.ALIM and dissimilar and self.f_val < max(self.best_archive, key=itemgetter(0))[0]:
-            heapq._heapreplace_max(self.best_archive, [self.f_val, self.x])
+            self.best_archive.remove(max(self.best_archive, key=itemgetter(0)))
+            self.best_archive.append([self.f_val, self.x])
             return
 
         # Archive full and x not dissimilar to solutions:
@@ -187,7 +185,6 @@ class Tabu_Search():
         plt.scatter([x[0] for x in points], [x[1] for x in points], c=t, s=10)
         plt.colorbar()
         plt.savefig(output_dir+title, dpi=300)
-        plt.show()
     
     def local_search(self):
         """Local search loop, including pattern move."""
@@ -329,8 +326,8 @@ if __name__ == "__main__":
 
     # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
     bound = 500
-    dims = 6
-    step_sizes = np.logspace(10, 50, 100, 250, 500)
+    dims = 2
+    step_sizes = np.logspace(10, 50, 100)
     step_size_dir = "TS_SS/"
     if not os.path.exists(step_size_dir):
         os.makedirs(step_size_dir)
@@ -341,7 +338,7 @@ if __name__ == "__main__":
         f_vals = []
         dim_vars = []
         f_eval_nums = []
-        for i in range(2):
+        for i in tqdm(range(2)):
             algo1 = Tabu_Search(max_iter=15000, step_size=ss, bound=bound, dims=dims, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
             start_time = timeit.default_timer()
             algo1.main_search()
@@ -375,13 +372,13 @@ if __name__ == "__main__":
     np.savetxt(step_size_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
     np.savetxt(step_size_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
     np.savetxt(step_size_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
-    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10")
-    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100")
-    plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime")
-    plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value")
-    plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance")
-    plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value")
-    plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value")
+    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10", step_size_dir)
+    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100", step_size_dir)
+    plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime", step_size_dir)
+    plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", step_size_dir)
+    plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", step_size_dir)
+    plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", step_size_dir)
+    plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", step_size_dir)
 
     #========================================== step size reduction factor ==========================================
     all_runtimes = []
@@ -400,7 +397,8 @@ if __name__ == "__main__":
     bound = 500
     dims = 6
     step_size = 100
-    ssrs = [0.5, 0.75, 0.85, 0.9, 0.95, 0.99]
+    # ssrs = [0.5, 0.75, 0.85, 0.9, 0.95, 0.99]
+    ssrs = [0.5, 0.9]
     ssr_dir = "TS_SSRED/"
     if not os.path.exists(ssr_dir):
         os.makedirs(ssr_dir)
@@ -411,7 +409,7 @@ if __name__ == "__main__":
         f_vals = []
         dim_vars = []
         f_eval_nums = []
-        for i in range(2):
+        for i in tqdm(range(2)):
             algo1 = Tabu_Search(max_iter=15000, step_size=step_size, bound=bound, dims=dims, ssr_tr=ssr, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
             start_time = timeit.default_timer()
             algo1.main_search()
@@ -445,10 +443,10 @@ if __name__ == "__main__":
     np.savetxt(ssr_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
     np.savetxt(ssr_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
     np.savetxt(ssr_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
-    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10")
-    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100")
-    plot_results(ssrs, all_runtimes, "Chain Length", "Runtime (s)", "Runtime")
-    plot_results(ssrs, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value")
-    plot_results(ssrs, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance")
-    plot_results(ssrs, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value")
-    plot_results(ssrs, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value")
+    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10", ssr_dir)
+    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100", ssr_dir)
+    plot_results(ssrs, all_runtimes, "Chain Length", "Runtime (s)", "Runtime", ssr_dir)
+    plot_results(ssrs, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value", ssr_dir)
+    plot_results(ssrs, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance", ssr_dir)
+    plot_results(ssrs, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value", ssr_dir)
+    plot_results(ssrs, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value", ssr_dir)
