@@ -4,6 +4,7 @@ import timeit
 import heapq
 from operator import itemgetter
 import os
+from Utils import *
 
 output_dir = "TS/"
 if not os.path.exists(output_dir):
@@ -243,12 +244,13 @@ class Tabu_Search():
         else:
             return False
     
-    def var_prioritise_local_search(self):
+    def var_prioritise_local_search(self, frac):
         """For larger dimensions, searching all control variables gets messy.
         Prioritise searching control variables with greatest influence on objective function. 
+        :param frac: Fraction of top varying control variables to search.
         """
         sensitivity = np.empty(self.DIMS)
-        self.to_change = None
+        self.to_change = []
         f = self.f(self.x)
         for i in range(self.DIMS):
             new_x = self.x
@@ -262,7 +264,7 @@ class Tabu_Search():
         # Return indices that would sort the sensitivity array ascending
         idxs = np.argsort(sensitivity)
         # Pick highest sensitivity variables to search
-        self.to_change = idxs[:int(self.DIMS/1.5)]
+        self.to_change = idxs[:int(self.DIMS*frac)]
         print(self.to_change)
         self.local_search()
 
@@ -296,14 +298,157 @@ class Tabu_Search():
                 self.step_size_reduction()
                 self.counter = 0
                 continue
+        # Get best solution sorted by function value in archive
+        self.best = sorted(self.best_archive, key=itemgetter(0))[0]   # Best solution
         # Plotting for 2D
         if self.DIMS == 2:
-            self.plot_2D(self.historic_archive, "2D_TS_prioritisation.png")
+            self.plot_2D(self.historic_archive, "2D_TS.png")
+            xs = [data[1] for data in self.best_archive]
+            self.plot_2D(xs, "2D_TS_archive.png")
+        
+
+# if __name__ == "__main__":
+#     runtimes = []         
+#     algo1 = Tabu_Search(max_iter=15000, step_size=100, bound=500, dims=10, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
+#     algo1.main_search()
+#     print(algo1.historic_archive)
+#     print(algo1.MTM)
 
 if __name__ == "__main__":
-    runtimes = []         
-    algo1 = Tabu_Search(max_iter=15000, step_size=100, bound=500, dims=10, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
-    algo1.main_search()
-    print(algo1.historic_archive)
-    print(algo1.MTM)
+    all_runtimes = []
+    all_f_vals = []
+    all_sol_variances = []
+    all_best_solutions = []
+    all_f_vals_variances = []
+    all_f_eval_nums = []
 
+    low_ss_archive = []
+    low_ss_evol = []
+    high_ss_archive = []
+    high_ss_evol = []
+
+    # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
+    bound = 500
+    dims = 6
+    step_sizes = np.logspace(10, 50, 100, 250, 500)
+    step_size_dir = "TS_SS/"
+    if not os.path.exists(step_size_dir):
+        os.makedirs(step_size_dir)
+
+    for ss in step_sizes:
+        runtimes = []
+        solutions = []
+        f_vals = []
+        dim_vars = []
+        f_eval_nums = []
+        for i in range(2):
+            algo1 = Tabu_Search(max_iter=15000, step_size=ss, bound=bound, dims=dims, ssr_tr=25, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
+            start_time = timeit.default_timer()
+            algo1.main_search()
+            runtimes.append(timeit.default_timer() - start_time)
+            # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
+            solutions.append(np.mean(algo1.best[1]))
+            f_vals.append(algo1.best[0])
+            f_eval_nums.append(algo1.f_evals)
+        all_runtimes.append(np.mean(np.array(runtimes)))
+        all_best_solutions.append(np.mean(np.array(solutions)))
+        # Mean variance of all dimensions in solution found
+        all_sol_variances.append(np.mean(np.array(solutions)))
+        all_f_vals_variances.append(np.var(np.array(f_vals)))
+        all_f_vals.append(np.mean(np.array(f_vals)))
+        all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
+        if ss == 10:
+            low_ss_archive = [data[0] for data in algo1.best_archive]
+            low_ss_evol = algo1.historic_archive_f
+        elif ss == 500:
+            high_ss_archive = [data[0] for data in algo1.best_archive]
+            high_ss_evol = algo1.historic_archive_f
+    
+    np.savetxt(step_size_dir+"function_evolution_cl10.csv", np.array(low_ss_evol), delimiter=",")
+    np.savetxt(step_size_dir+"function_evolution_cl100.csv", np.array(high_ss_evol), delimiter=",")
+    np.savetxt(step_size_dir+"best_archive_cl10.csv", np.array(low_ss_archive), delimiter=",")
+    np.savetxt(step_size_dir+"best_archive_cl100.csv", np.array(high_ss_archive), delimiter=",")
+    np.savetxt(step_size_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
+    np.savetxt(step_size_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
+    np.savetxt(step_size_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
+    np.savetxt(step_size_dir+"step_sizes.csv", np.array(step_sizes), delimiter=",")
+    np.savetxt(step_size_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
+    np.savetxt(step_size_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
+    np.savetxt(step_size_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
+    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10")
+    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100")
+    plot_results(step_sizes, all_runtimes, "Chain Length", "Runtime (s)", "Runtime")
+    plot_results(step_sizes, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value")
+    plot_results(step_sizes, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance")
+    plot_results(step_sizes, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value")
+    plot_results(step_sizes, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value")
+
+    #========================================== step size reduction factor ==========================================
+    all_runtimes = []
+    all_f_vals = []
+    all_sol_variances = []
+    all_best_solutions = []
+    all_f_vals_variances = []
+    all_f_eval_nums = []
+
+    low_ss_archive = []
+    low_ss_evol = []
+    high_ss_archive = []
+    high_ss_evol = []
+
+    # Bound dimensions defines dimensionality of problem (no separate specification to avoid clashes)
+    bound = 500
+    dims = 6
+    step_size = 100
+    ssrs = [0.5, 0.75, 0.85, 0.9, 0.95, 0.99]
+    ssr_dir = "TS_SSRED/"
+    if not os.path.exists(ssr_dir):
+        os.makedirs(ssr_dir)
+
+    for ssr in ssrs:
+        runtimes = []
+        solutions = []
+        f_vals = []
+        dim_vars = []
+        f_eval_nums = []
+        for i in range(2):
+            algo1 = Tabu_Search(max_iter=15000, step_size=step_size, bound=bound, dims=dims, ssr_tr=ssr, intensify_tr=10, diversify_tr=15, ssr_redu_factor=0.9, len_stm=7, len_mtm=12, grid_num=4, conv_step_size=5, dmin=50, dsim=5, a_lim=10)
+            start_time = timeit.default_timer()
+            algo1.main_search()
+            runtimes.append(timeit.default_timer() - start_time)
+            # Add mean value of all dimensions in solution found (i.e. take mean over dims AND runs)
+            solutions.append(np.mean(algo1.best[1]))
+            f_vals.append(algo1.best[0])
+            f_eval_nums.append(algo1.f_evals)
+        all_runtimes.append(np.mean(np.array(runtimes)))
+        all_best_solutions.append(np.mean(np.array(solutions)))
+        # Mean variance of all dimensions in solution found
+        all_sol_variances.append(np.mean(np.array(solutions)))
+        all_f_vals_variances.append(np.var(np.array(f_vals)))
+        all_f_vals.append(np.mean(np.array(f_vals)))
+        all_f_eval_nums.append(np.mean(np.array(f_eval_nums)))
+        if ss == 10:
+            low_ss_archive = [data[0] for data in algo1.best_archive]
+            low_ss_evol = algo1.historic_archive_f
+        elif ss == 500:
+            high_ss_archive = [data[0] for data in algo1.best_archive]
+            high_ss_evol = algo1.historic_archive_f
+
+    np.savetxt(ssr_dir+"function_evolution_cl10.csv", np.array(low_ss_evol), delimiter=",")
+    np.savetxt(ssr_dir+"function_evolution_cl100.csv", np.array(high_ss_evol), delimiter=",")
+    np.savetxt(ssr_dir+"best_archive_cl10.csv", np.array(low_ss_archive), delimiter=",")
+    np.savetxt(ssr_dir+"best_archive_cl100.csv", np.array(high_ss_archive), delimiter=",")
+    np.savetxt(ssr_dir+"runtimes.csv", np.array(all_runtimes), delimiter=",")
+    np.savetxt(ssr_dir+"bestsols.csv", np.array(all_best_solutions), delimiter=",")
+    np.savetxt(ssr_dir+"solvariances.csv", np.array(all_sol_variances), delimiter=",")
+    np.savetxt(ssr_dir+"ssrs.csv", np.array(ssrs), delimiter=",")
+    np.savetxt(ssr_dir+"f_vals.csv", np.array(all_f_vals), delimiter=",")
+    np.savetxt(ssr_dir+"f_vals_variances.csv", np.array(all_f_vals_variances), delimiter=",")
+    np.savetxt(ssr_dir+"f_eval_nums.csv", np.array(all_f_eval_nums), delimiter=",")
+    plot_results(np.arange(0, len(low_ss_evol)), low_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl10")
+    plot_results(np.arange(0, len(high_ss_evol)), high_ss_evol, "Accepted move number", "Function Value", "function_evolution_cl100")
+    plot_results(ssrs, all_runtimes, "Chain Length", "Runtime (s)", "Runtime")
+    plot_results(ssrs, all_best_solutions, "Chain Length", "Average Solution Control Variable Value", "Average Solution Control Variable Value")
+    plot_results(ssrs, all_sol_variances, "Chain Length", "Average Control Variable Variance", "Average Control Variable Variance")
+    plot_results(ssrs, all_f_vals, "Chain Length", "Average Function Value", "Average Function Value")
+    plot_results(ssrs, all_f_vals_variances, "Chain Length", "Variance in Function Value", "Variance in Function Value")

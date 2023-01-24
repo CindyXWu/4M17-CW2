@@ -48,5 +48,14 @@ def plot_2D(title):
     plt.savefig(title, dpi=300)
     plt.show()
 
+def plot_results(x, y, xlabel, ylabel, title):
+    """Plot average function value or variance as a function of some parameter"""
+    fig = plt.figure(figsize=(10,6))
+    ax  = fig.add_subplot(111)
+    ax.plot(x, y)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    plt.savefig(output_dir+title)
+
 if __name__ == "__main__":
     plot_2D("Schwefel_penalty_2D.png")
